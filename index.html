@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>검진 문구 복사</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f8fafc;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .phrase-card {
+            transition: all 0.15s ease;
+        }
+        .phrase-card:hover {
+            transform: translateY(-1px);
+            border-color: #3b82f6;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1), 0 2px 4px -1px rgba(59, 130, 246, 0.06);
+        }
+        .phrase-card:active {
+            transform: scale(0.995);
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col">
+
+<!-- 하단 정중앙 및 아래에서 위로 부드럽게 나타나는 토스트 -->
+<div id="toast" class="fixed top-32 left-1/2 transform -translate-x-1/2 translate-y-10 z-50 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 border border-slate-700">
+        <div class="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs">
+            <i class="fa-solid fa-check"></i>
+        </div>
+        <div>
+            <p class="font-semibold text-sm">복사 완료!</p>
+            <p id="toast-text" class="text-xs text-slate-400">클립보드에 저장되었습니다.</p>
+        </div>
+    </div>
+</div>
+
+    <!-- Top Sticky Header Area -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                            <i class="fa-solid fa-notes-medical text-sm"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-lg text-slate-900 leading-tight">LKA 검진 문구 복사</h1>
+                            <p class="text-xs text-slate-500">문구를 누르면 즉시 복사됩니다</p>
+                        </div>
+                    </div>
+                    <button onclick="openManagerModal()" class="md:hidden inline-flex items-center space-x-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>관리</span>
+                    </button>
+                </div>
+
+                <div class="flex-1 max-w-md mx-auto w-full">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-search text-sm"></i>
+                        </span>
+                        <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="문구 내용을 검색하세요..." 
+                            class="w-full pl-9 pr-4 py-2 bg-slate-100 border border-transparent rounded-xl text-sm focus:bg-white focus:border-blue-500 focus:outline-none transition shadow-inner">
+                        <button id="clear-search" onclick="clearSearch()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 hidden">
+                            <i class="fa-solid fa-circle-xmark text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex items-center space-x-3">
+                    <button onclick="openManagerModal()" class="inline-flex items-center space-x-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition shadow-sm hover:shadow">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>문구 관리</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Categories Tabs (동적 생성) -->
+            <div id="main-category-tabs" class="mt-3 pt-2 border-t border-slate-100 flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-none">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6">
+        <div class="flex items-center justify-between mb-4 bg-blue-50/50 border border-blue-100 px-4 py-3 rounded-xl">
+            <div class="flex items-center space-x-2 text-xs text-blue-800">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>원하시는 문구를 클릭하시면 즉시 클립보드에 복사됩니다. 대분류 관리 및 순서 수정은 우측 상단 [문구 관리]에서 가능합니다.</span>
+            </div>
+            <div class="text-xs font-semibold text-blue-900 bg-blue-100/80 px-2.5 py-1 rounded-md shrink-0 ml-2">
+                총 <span id="phrase-count">0</span>개 문구
+            </div>
+        </div>
+
+        <div id="phrases-list" class="space-y-2"></div>
+
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-2xl mb-4">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <h3 class="text-base font-semibold text-slate-700">등록된 문구가 없습니다</h3>
+            <p class="text-sm text-slate-500 mt-1">상단의 '문구 관리' 버튼을 눌러 새로운 문구를 추가해 보세요.</p>
+        </div>
+    </main>
+
+    <!-- Phrase Management Modal -->
+    <div id="manager-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+            <!-- Modal Header & Tab Switcher -->
+            <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <h2 class="font-bold text-lg text-slate-800">관리 센터</h2>
+                    </div>
+                    <!-- Tab Buttons -->
+                    <div class="flex bg-slate-200 p-1 rounded-lg text-xs font-semibold">
+                        <button id="tab-btn-phrases" onclick="switchModalTab('phrases')" class="px-3 py-1.5 rounded-md bg-white text-blue-600 shadow-sm transition">문구 관리</button>
+                        <button id="tab-btn-categories" onclick="switchModalTab('categories')" class="px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition">대분류 관리</button>
+                    </div>
+                </div>
+                <button onclick="closeManagerModal()" class="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- View 1: 문구 관리 -->
+            <div id="modal-view-phrases" class="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Form: Add / Edit Phrase -->
+                <div class="lg:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 h-fit">
+                    <h3 id="form-title" class="font-semibold text-slate-800 text-sm mb-3 flex items-center space-x-2">
+                        <i class="fa-solid fa-plus text-blue-600"></i>
+                        <span>새 문구 추가하기</span>
+                    </h3>
+                    <form id="phrase-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                        <input type="hidden" id="edit-id">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">대분류 선택</label>
+                            <select id="form-category" required class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">문구 내용</label>
+                            <textarea id="form-content" rows="4" required placeholder="상세 문구를 입력하세요..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                        </div>
+                        <div class="flex items-center space-x-2 pt-2">
+                            <button type="submit" id="submit-btn" class="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow">추가하기</button>
+                            <button type="button" id="cancel-edit-btn" onclick="resetForm()" class="hidden px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition">취소</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right List: Manage existing phrases -->
+                <div class="lg:col-span-2 flex flex-col">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-2">
+                        <h3 class="font-semibold text-slate-800 text-[15px]">등록된 문구 목록</h3>
+                        <span id="modal-total-count" class="text-xs text-slate-500">전체 0개</span>
+                    </div>
+
+                    <!-- Modal Category Tabs (동적 생성) -->
+                    <div id="modal-category-tabs" class="flex items-center space-x-1.5 overflow-x-auto pb-2 mb-2 scrollbar-none">
+                    </div>
+
+                    <div class="flex-1 border border-slate-200 rounded-xl overflow-hidden bg-white max-h-[350px] overflow-y-auto">
+                        <div id="modal-phrases-list" class="divide-y divide-slate-100"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 2: 대분류 관리 -->
+            <div id="modal-view-categories" class="hidden flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Form: Add / Edit Category -->
+                <div class="lg:col-span-1 bg-slate-50 p-4 rounded-xl border border-slate-200 h-fit">
+                    <h3 id="cat-form-title" class="font-semibold text-slate-800 text-sm mb-3 flex items-center space-x-2">
+                        <i class="fa-solid fa-folder-plus text-blue-600"></i>
+                        <span>새 대분류 추가</span>
+                    </h3>
+                    <form onsubmit="handleCategorySubmit(event)" class="space-y-4">
+                        <input type="hidden" id="cat-edit-id">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-600 mb-1">대분류명</label>
+                            <input type="text" id="cat-name-input" required placeholder="예: 소화기내과" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        </div>
+                        <div class="flex items-center space-x-2 pt-2">
+                            <button type="submit" id="cat-submit-btn" class="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow">추가하기</button>
+                            <button type="button" id="cat-cancel-btn" onclick="resetCategoryForm()" class="hidden px-3 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition">취소</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right List: Manage Categories -->
+                <div class="lg:col-span-2 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-slate-800 text-[15px]">등록된 대분류 목록 및 순서 설정</h3>
+                        <span class="text-xs text-slate-500">화살표로 표출 순서를 변경할 수 있습니다</span>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-xl overflow-hidden bg-white max-h-[350px] overflow-y-auto">
+                        <div id="category-management-list" class="divide-y divide-slate-100"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+                <!-- 백업 / 불러오기 버튼 영역 추가 -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="backupData()" class="inline-flex items-center space-x-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition shadow-sm">
+                        <i class="fa-solid fa-download"></i>
+                        <span>백업하기</span>
+                    </button>
+                    <label class="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 transition shadow-sm cursor-pointer">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>불러오기</span>
+                        <input type="file" id="restore-file-input" accept=".json" onchange="restoreData(event)" class="hidden">
+                    </label>
+                </div>
+                <button onclick="closeManagerModal()" class="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition">완료</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & App Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIBGZYXRv2qRQQqbWIkR6YqQ-5Mcx9F5U",
+            authDomain: "medical-phrase-app.firebaseapp.com",
+            projectId: "medical-phrase-app",
+            storageBucket: "medical-phrase-app.firebasestorage.app",
+            messagingSenderId: "313189386743",
+            appId: "1:313189386743:web:7aa7edd60b60551d4ac6f2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const PHRASES_COLLECTION = "medical_phrases";
+        const CATEGORIES_COLLECTION = "medical_categories";
+
+        const defaultCategories = ['위내시경', '유방촬영', '자궁경부', '간초음파', '대장내시경', '생활습관'];
+
+        const rawDefaultData = [
+            { category: '위내시경', text: '위내시경 검사상 미란성 위염 소견으로 약물 치료 하시고 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 발적성 위염 소견으로 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염 소견으로 경과 관찰 하시고 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염 소견으로 정기적인 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염,헬리코박터균 음성 소견이 관찰 됩니다. 정기적인 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 미란성 위염 소견으로 약물 치료 요망 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위염 소견으로 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염 소견으로 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염,헬리코박터균 음성 소견이 관찰 됩니다. 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염,헬리코박터균 양성 소견으로 제균치료 필요하며 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염,장상피화생 소견으로 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염,장상피화생,헬리코박터균 음성 소견이 관찰 됩니다. 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염,장상피화생,헬리코박터균 양성 소견으로 제균치료 필요하며 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염,역류성 식도염 소견으로 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 표재성 위염, 미란, 역류성 식도염 소견으로 2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염 소견으로 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위염이 관찰됩니다. 속쓰림, 소화 불량 등의 증상 없다면 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 발적성 위염,헬리코박터균 음성 소견이 관찰 됩니다. 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 역류성 식도염,미란성 위염 소견으로 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 만성 위축성 위염,장상피화생,헬리코박터균 양성 소견으로 1~2년마다 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 십이지장 궤양 반흔,위궤양,헬리코박터균 양성 소견으로 추적 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 발적성 위염,헬리코박터균 양성 소견으로 1~2년후 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 위점막하종양 소견으로 1년후 추적 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 위점막하종양,헬리코박터균 음성 소견이 관찰 됩니다. 1년후 추적 위내시경 검사가 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 위점막하병변 의심 소견으로 추가 검사 권장 됩니다.' },
+            { category: '위내시경', text: '위내시경 검사상 위점막하종양 소견으로 초음파 내시경 등의 추가검사 위해 상급병원 전원 권장 됩니다.' },
+            { category: '위내시경', text: '(과거 검사와 비교시 변화 없음)' },
+            { category: '위내시경', text: '대동맥궁 동맥경화성 석회화       3(산재함)' },
+            { category: '유방촬영', text: '유방촬영 검사상 정상입니다. 1~2년후 정기검진 받으시기 바랍니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 정상입니다. 정기검진 받으시기 바랍니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 소견으로 자세한 관찰이 어렵습니다. 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 양측 유방에 양성석회화 소견으로 1년 후 정기검진을 통하여 추적 관찰하시기 바랍니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 양측 양성석회화 소견으로 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 좌측 유방 종괴 의심 소견으로 유방초음파 등의 추가검사 요합니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 좌측 유방 양성석회화 소견 보이며 유방 초음파 검사상 좌측유방 낭종 관찰 소견으로 1년후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 좌측 유방 양성석회화 소견 보이며 유방 초음파 검사상 이상없어 1~2년후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 양측 유방 양성석회화 소견 보이며 유방 초음파 검사상 좌측유방 결절 관찰 소견으로 6개월후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 좌측 유방 양성석회화 소견 보이며 유방 초음파 검사상 양측유방 낭종성 병변 관찰 소견으로 6개월후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 우측 미세석회화 소견 보이며 유방 초음파 검사상 우측에 조직검사 요하는 병변있어 전문의 진료 요합니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 양측 미세석회화 증가 소견 보이며 유방 초음파 검사상 좌측유방 결절 관찰 소견으로 국소압박확대 촬영 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 좌측 미세석회화 소견으로 유방 초음파, 국소압박확대 촬영 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 우측 유방 국소비대칭음영(1cm) 소견으로 과거 검사와 비교, 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 우측 유방 국소비대칭음영(1.2cm, 과거 검사와 비교시 새로 발생) 소견으로 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 양측 유방 국소비대칭음영 소견으로 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 및 양측 보형물 삽입 상태 관찰 소견으로 유방 초음파 등의 추가 검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 소견 보이며 당일 시행한 유방 초음파 검사상 특이소견 없습니다. 정기적인 검진 받으세요.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 소견 보이며 당일 시행한 유방 초음파 검사상 낭종 및 결절 소견으로 6개월후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방 촬영 검사상 치밀유방 소견 보이며 당일 시행한 유방 초음파 검사상 우측 유방에 낭종 소견으로 1년후 추적검사가 권장 됩니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 양측 유방에 인공보형물 관찰 소견으로 1년후 추적검사 권장 됩니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 양측 유방내 이물질 주입상태 관찰 소견으로 판정 불가하여 MRI로 검진하세요.' },
+            { category: '유방촬영', text: '유방촬영 검사상 양성 석회화 의심 소견으로 이 병변들은 암과의 관련성은 낮은 양성 소견이나, 변화의 유무를 살펴보기 위해 1년 후 정기검진을 통하여 추적 관찰하시기 바랍니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 혈관 석회화 소견이 관찰됩니다. 이 병변은 양성소견으로 암과의 연관성은 없는 것으로 알려져 있습니다. 2년 후 정기검진을 받으시길 바랍니다.' },
+            { category: '유방촬영', text: '유방촬영 검사상 미세석회화가 의심됩니다.  진료 상담 후 국소 유방확대촬영 검사 등의 추가검사가 권장 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 염증관련 반응성 세포변화 관찰 소견으로 염증 치료 받으시고 자궁경부 확대촬영술 검사상 6개월후 재검 요망 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 정상 소견 보이나 자궁경부 확대촬영술 검사상 조직검사 권장 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 정상 소견 보이나 자궁경부 확대촬영술 검사상 조직검사 권장 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 정상 소견 보이나 자궁경부 확대촬영술 검사상 HPV(인유두종바이러스) 검사 권장 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 정상 소견 보이나 자궁경부 확대촬영술 검사상 6개월후 재검 요망 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 세균성 질염 관찰 소견으로 염증 치료 받으시고 정기검진 요합니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 캔디다 관찰 소견으로 캔디다 치료 받으시고 정기검진 요합니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 질세균 분포변화 관찰 소견으로 염증 치료 받으시고 정기검진 요합니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 위축성 질염 관찰 소견으로 내원 치료 받으시고 정기검진 요망 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 위축성 세포변화 관찰 소견으로 질염 치료 받으시고 정기검진 요망 됩니다.' },
+            { category: '자궁경부', text: '자궁경부세포 검사상 위축성 세포변화 이외에 이상 소견이 없습니다. 6개월후 정기검진 권장 됩니다.' },
+            { category: '자궁경부', text: '자궁경부세포 검사상 위축성 세포변화 이외에 이상 소견이 없습니다. 이전 이상 소견이 있었던 경우가 아니면 정기검진 받으시기 바랍니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 염증관련 반응성 세포변화 보여 염증 치료하시고 자궁경부 확대촬영술 검사상 추가적인 HPV 검사가 권장되며 6개월후 추적검사가 요망 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 염증관련 반응성 세포변화 보여 염증 치료하시고 6개월후 재검 요망되며 자궁경부 확대촬영술 검사상 폴립제거 및 조직검사 권장 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 염증관련 반응성 세포변화 보여 염증 치료하시고  6개월후 재검 요망되며 자궁경부 확대촬영술 검사상 HPV(인유두종바이러스) 검사 권장 됩니다.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 비정형 편평상피 세포이상 관찰 소견으로 정밀 검사가 요망 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 저등급 편평상피세포내 병변 소견으로 재검 또는 정밀 검사가 요망 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '자궁경부', text: '자궁경부 세포진 검사상 고등급 편평상피세포 내 병변 소견으로 정밀 검사가 요망 됩니다. 내원하시어 상담 받으세요.' },
+            { category: '대장내시경', text: '대장내시경 검사 결과 정상입니다. 5년후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 용종 2개 관찰되어 제거 하였습니다. 3년후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 용종 2개 관찰되어 제거 하였고 조직검사상 저도선종 소견 보입니다. 3년후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 용종 1개 관찰되어 제거 하였고 조직검사상 톱니용종 소견 보입니다. 18개월후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 대장 용종 관찰되며 조직검사상 저도선종 소견 보입니다. 대장용종 절제술 위해 3차병원 진료 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 내치핵 이외에 특이소견 없습니다. 5년후 대장내시경 검사가 권장 됩니다.' },
+            { category: '대장내시경', text: '대장 내시경 검사상 관찰 범위내에서 특이소견 없으나 장정결 불량하여 일부 불완전한 검사였습니다. 1년후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '대장내시경 검사상 장정결 불량하여 관찰에 제한이 있었으나 관찰 범위내에서 특이소견 없습니다. 5년후 대장내시경 검사 권장 됩니다.' },
+            { category: '대장내시경', text: '복부초음파 검사상 간내석회화,담낭용종,신장 낭종 소견 보이며, 간암 수치는 정상입니다. 6개월후 추적검사 권장 됩니다.' },
+            { category: '대장내시경', text: '간초음파 검사상 지방간 소견 보이며, 간암수치는 정상입니다. 정기적인 간암검진 받으시기 바랍니다.' },
+            { category: '대장내시경', text: '간초음파 검사상 만성 간질환 소견 보이며, 간암수치는 정상입니다. 6개월마다 정기적인 간암검진을 받으시기 바랍니다.' },
+            { category: '대장내시경', text: '분변잠혈반응 검사 결과 대변에서 혈액이 검출 됩니다. 이러한 경우 단순 항문 출혈의 가능성도 있으나 대장에 병변(염증, 용종, 암 등)이 있을 가능성이 있으므로 대장내시경 검사를 반드시 받아보시기 바랍니다.' },
+            { category: '대장내시경', text: '복부초음파 검사상 총담관확장,담낭선근종증,담낭결석 소견 보이며, 간암 수치는 정상입니다. 의료기관 상담 요망 됩니다.' },
+            { category: '생활습관', text: '일주일에 2차례 이상의 근력 운동 권장 됩니다.' },
+            { category: '생활습관', text: '당뇨 전단계 소견으로 운동,식이요법 및 정기적 당뇨 검사 권장 됩니다.' },
+            { category: '생활습관', text: '고혈압 소견으로 운동,식이요법 및 약물치료 권장 됩니다.' },
+            { category: '생활습관', text: '운동 부족으로 규칙적이고 꾸준한 운동요법 권장 됩니다.' },
+            { category: '생활습관', text: '비만,운동 부족 상태 입니다. 꾸준한 운동 및 식이 조절을 통한 체중감량 권장 됩니다.' },
+            { category: '생활습관', text: '생활습관 양호 합니다. 꾸준한 건강 관리 바랍니다.' },
+            { category: '생활습관', text: '유제품,단백질 식품군,과일 등의 골고른 음식 섭취 권장 됩니다.' }
+        ];
+
+        let categories = [];
+        let phrases = [];
+        let currentCategory = '전체';
+        let currentModalCategory = '전체';
+        let searchQuery = '';
+        let toastTimeout = null;
+
+        // Firebase 통합 데이터 불러오기
+        window.loadDataFromFirebase = async function() {
+            try {
+                // 1. 대분류 데이터 가져오기
+                const catSnapshot = await getDocs(collection(db, CATEGORIES_COLLECTION));
+                categories = [];
+                catSnapshot.forEach((docSnap) => {
+                    categories.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                if (categories.length === 0) {
+                    await initDefaultCategories();
+                } else {
+                    categories.sort((a, b) => (a.order || 0) - (b.order || 0));
+                }
+
+                // 2. 문구 데이터 가져오기
+                const phraseSnapshot = await getDocs(collection(db, PHRASES_COLLECTION));
+                phrases = [];
+                phraseSnapshot.forEach((docSnap) => {
+                    phrases.push({ id: docSnap.id, ...docSnap.data() });
+                });
+
+                if (phrases.length === 0) {
+                    await initFirebaseDefaultDataInternal();
+                }
+
+                renderAllUI();
+            } catch (error) {
+                console.error("Firebase 데이터 로드 실패:", error);
+                showToast("데이터를 불러오는 중 오류가 발생했습니다.");
+            }
+        };
+
+        async function initDefaultCategories() {
+            const batch = writeBatch(db);
+            categories = defaultCategories.map((name, index) => {
+                const id = 'cat_' + index + '_' + Date.now();
+                const obj = { id, name, order: index };
+                batch.set(doc(db, CATEGORIES_COLLECTION, id), obj);
+                return obj;
+            });
+            await batch.commit();
+        }
+
+        async function initFirebaseDefaultDataInternal() {
+            const batch = writeBatch(db);
+            phrases = rawDefaultData.map((item, index) => {
+                const id = 'p_' + index + '_' + Date.now();
+                const newObj = { id, category: item.category, content: item.text, order: index };
+                const docRef = doc(db, PHRASES_COLLECTION, id);
+                batch.set(docRef, newObj);
+                return newObj;
+            });
+            await batch.commit();
+        }
+
+        function renderAllUI() {
+            renderCategoryTabs();
+            renderSelectOptions();
+            renderPhrases();
+            renderModalPhrasesList();
+            renderCategoryManagementList();
+        }
+
+        // 상단 및 모달 탭 동적 그려주기
+        function renderCategoryTabs() {
+            const mainTabs = document.getElementById('main-category-tabs');
+            const modalTabs = document.getElementById('modal-category-tabs');
+
+            let mainHTML = `<button onclick="filterCategory('전체')" class="category-btn whitespace-nowrap px-4 py-1.5 rounded-lg text-sm font-medium transition ${currentCategory === '전체' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" data-category="전체">전체 보기</button>`;
+            let modalHTML = `<button onclick="filterModalCategory('전체')" class="modal-cat-btn whitespace-nowrap px-3 py-1 rounded-lg text-sm font-medium transition ${currentModalCategory === '전체' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" data-modal-category="전체">전체</button>`;
+
+            categories.forEach(cat => {
+                const isMainActive = currentCategory === cat.name;
+                const isModalActive = currentModalCategory === cat.name;
+
+                mainHTML += `<button onclick="filterCategory('${cat.name}')" class="category-btn whitespace-nowrap px-4 py-1.5 rounded-lg text-sm font-medium transition ${isMainActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" data-category="${cat.name}">${cat.name}</button>`;
+                modalHTML += `<button onclick="filterModalCategory('${cat.name}')" class="modal-cat-btn whitespace-nowrap px-3 py-1 rounded-lg text-sm font-medium transition ${isModalActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}" data-modal-category="${cat.name}">${cat.name}</button>`;
+            });
+
+            if (mainTabs) mainTabs.innerHTML = mainHTML;
+            if (modalTabs) modalTabs.innerHTML = modalHTML;
+        }
+
+        function renderSelectOptions() {
+            const select = document.getElementById('form-category');
+            if (!select) return;
+            select.innerHTML = categories.map(cat => `<option value="${cat.name}">${cat.name}</option>`).join('');
+        }
+
+        window.filterCategory = function(category) {
+            currentCategory = category;
+            renderCategoryTabs();
+            renderPhrases();
+        };
+
+        window.filterModalCategory = function(category) {
+            currentModalCategory = category;
+            renderCategoryTabs();
+            renderModalPhrasesList();
+        };
+
+        window.handleSearch = function(val) {
+            searchQuery = val.trim().toLowerCase();
+            const clearBtn = document.getElementById('clear-search');
+            if (searchQuery.length > 0) clearBtn.classList.remove('hidden');
+            else clearBtn.classList.add('hidden');
+            renderPhrases();
+        };
+
+        window.clearSearch = function() {
+            document.getElementById('search-input').value = '';
+            searchQuery = '';
+            document.getElementById('clear-search').classList.add('hidden');
+            renderPhrases();
+        };
+
+        function renderPhrases() {
+            const listContainer = document.getElementById('phrases-list');
+            const emptyState = document.getElementById('empty-state');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            // 대분류 순서 기반 정렬
+            const categoryOrderMap = {};
+            categories.forEach((cat, idx) => { categoryOrderMap[cat.name] = idx; });
+
+            let sorted = [...phrases].sort((a, b) => {
+                let orderA = categoryOrderMap[a.category] !== undefined ? categoryOrderMap[a.category] : 999;
+                let orderB = categoryOrderMap[b.category] !== undefined ? categoryOrderMap[b.category] : 999;
+                if (orderA !== orderB) return orderA - orderB;
+                return (a.order || 0) - (b.order || 0);
+            });
+
+            let filtered = sorted.filter(p => {
+                const matchCategory = (currentCategory === '전체' || p.category === currentCategory);
+                const matchSearch = searchQuery === '' || p.content.toLowerCase().includes(searchQuery) || p.category.toLowerCase().includes(searchQuery);
+                return matchCategory && matchSearch;
+            });
+
+            const countEl = document.getElementById('phrase-count');
+            if (countEl) countEl.textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                if (emptyState) emptyState.classList.remove('hidden');
+                return;
+            } else {
+                if (emptyState) emptyState.classList.add('hidden');
+            }
+
+            filtered.forEach((p) => {
+                const card = document.createElement('div');
+                card.className = "phrase-card bg-white border border-slate-200 rounded-xl p-2 shadow-sm cursor-pointer flex items-center justify-between gap-4";
+                card.title = "클릭하면 즉시 복사됩니다";
+
+                let badgeColor = "bg-slate-100 text-slate-700";
+                if (p.category === '위내시경') badgeColor = "bg-amber-50 text-amber-700 border border-amber-200/60";
+                if (p.category === '유방촬영') badgeColor = "bg-rose-50 text-rose-700 border border-rose-200/60";
+                if (p.category === '자궁경부') badgeColor = "bg-purple-50 text-purple-700 border border-purple-200/60";
+                if (p.category === '간초음파') badgeColor = "bg-orange-100 text-orange-800 border border-orange-200/60";
+                if (p.category === '대장내시경') badgeColor = "bg-emerald-50 text-emerald-700 border border-emerald-200/60";
+                if (p.category === '생활습관') badgeColor = "bg-sky-50 text-sky-700 border border-sky-200/60";
+
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1 overflow-hidden">
+                        <span class="text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${badgeColor}">${escapeHtml(p.category)}</span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-slate-900 text-[15px] leading-relaxed">${escapeHtml(p.content)}</p>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    copyToClipboard(p.content);
+                });
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        // 대분류 C.R.U.D 처리 함수
+        window.handleCategorySubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('cat-edit-id').value;
+            const name = document.getElementById('cat-name-input').value.trim();
+
+            if (!name) return;
+
+            if (id) {
+                const oldCat = categories.find(c => c.id === id);
+                if (oldCat && oldCat.name !== name) {
+                    const batch = writeBatch(db);
+                    oldCat.name = name;
+                    batch.set(doc(db, CATEGORIES_COLLECTION, id), oldCat);
+
+                    phrases.forEach(p => {
+                        if (p.category === oldCat.name) {
+                            p.category = name;
+                            batch.set(doc(db, PHRASES_COLLECTION, p.id), p);
+                        }
+                    });
+
+                    await batch.commit();
+                    showToast('대분류 이름이 변경되었습니다.');
+                }
+            } else {
+                const newId = 'cat_' + Date.now();
+                const newCat = { id: newId, name, order: categories.length };
+                await setDoc(doc(db, CATEGORIES_COLLECTION, newId), newCat);
+                categories.push(newCat);
+                showToast('새 대분류가 추가되었습니다.');
+            }
+
+            resetCategoryForm();
+            renderAllUI();
+        };
+
+        window.editCategory = function(id) {
+            const cat = categories.find(c => c.id === id);
+            if (!cat) return;
+            document.getElementById('cat-edit-id').value = cat.id;
+            document.getElementById('cat-name-input').value = cat.name;
+            document.getElementById('cat-form-title').innerHTML = `<i class="fa-solid fa-pen text-blue-600"></i><span>대분류 수정</span>`;
+            document.getElementById('cat-submit-btn').textContent = '수정 완료';
+            document.getElementById('cat-cancel-btn').classList.remove('hidden');
+        };
+
+        window.deleteCategory = async function(id) {
+            const cat = categories.find(c => c.id === id);
+            if (!cat) return;
+
+            const usedCount = phrases.filter(p => p.category === cat.name).length;
+            if (usedCount > 0) {
+                if (!confirm(`'${cat.name}' 대분류에 속한 문구가 ${usedCount}개 있습니다. 대분류를 삭제하시겠습니까?`)) return;
+            } else {
+                if (!confirm(`'${cat.name}' 대분류를 삭제하시겠습니까?`)) return;
+            }
+
+            await deleteDoc(doc(db, CATEGORIES_COLLECTION, id));
+            categories = categories.filter(c => c.id !== id);
+
+            if (currentCategory === cat.name) currentCategory = '전체';
+            if (currentModalCategory === cat.name) currentModalCategory = '전체';
+
+            showToast('대분류가 삭제되었습니다.');
+            renderAllUI();
+        };
+
+        window.moveCategoryOrder = async function(id, direction) {
+            const idx = categories.findIndex(c => c.id === id);
+            if (idx < 0) return;
+            if (direction === 'up' && idx > 0) {
+                const temp = categories[idx];
+                categories[idx] = categories[idx - 1];
+                categories[idx - 1] = temp;
+            } else if (direction === 'down' && idx < categories.length - 1) {
+                const temp = categories[idx];
+                categories[idx] = categories[idx + 1];
+                categories[idx + 1] = temp;
+            } else return;
+
+            const batch = writeBatch(db);
+            categories.forEach((cat, i) => {
+                cat.order = i;
+                batch.set(doc(db, CATEGORIES_COLLECTION, cat.id), cat);
+            });
+            await batch.commit();
+            renderAllUI();
+        };
+
+        window.resetCategoryForm = function() {
+            document.getElementById('cat-edit-id').value = '';
+            document.getElementById('cat-name-input').value = '';
+            document.getElementById('cat-form-title').innerHTML = `<i class="fa-solid fa-folder-plus text-blue-600"></i><span>새 대분류 추가</span>`;
+            document.getElementById('cat-submit-btn').textContent = '추가하기';
+            document.getElementById('cat-cancel-btn').classList.add('hidden');
+        };
+
+        function renderCategoryManagementList() {
+            const listContainer = document.getElementById('category-management-list');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            categories.forEach((cat) => {
+                const count = phrases.filter(p => p.category === cat.name).length;
+                const item = document.createElement('div');
+                item.className = "p-3 flex items-center justify-between hover:bg-slate-50 transition text-sm gap-2";
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="font-semibold text-slate-800">${escapeHtml(cat.name)}</span>
+                        <span class="text-xs text-slate-400">등록 문구 ${count}개</span>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0">
+                        <div class="flex items-center space-x-0.5 mr-1 text-slate-400">
+                            <button onclick="moveCategoryOrder('${cat.id}', 'up')" title="위로 이동" class="w-6 h-6 rounded hover:bg-slate-200 flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-up"></i></button>
+                            <button onclick="moveCategoryOrder('${cat.id}', 'down')" title="아래로 이동" class="w-6 h-6 rounded hover:bg-slate-200 flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-down"></i></button>
+                        </div>
+                        <button onclick="editCategory('${cat.id}')" class="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-blue-50 hover:text-blue-600 transition">이름 수정</button>
+                        <button onclick="deleteCategory('${cat.id}')" class="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-red-50 hover:text-red-600 transition">삭제</button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // 모달 내 탭 전환 (문구 관리 / 대분류 관리)
+        window.switchModalTab = function(tab) {
+            const phraseView = document.getElementById('modal-view-phrases');
+            const catView = document.getElementById('modal-view-categories');
+            const btnPhrases = document.getElementById('tab-btn-phrases');
+            const btnCat = document.getElementById('tab-btn-categories');
+
+            if (tab === 'phrases') {
+                phraseView.classList.remove('hidden');
+                catView.classList.add('hidden');
+                btnPhrases.className = "px-3 py-1.5 rounded-md bg-white text-blue-600 shadow-sm transition";
+                btnCat.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition";
+            } else {
+                phraseView.classList.add('hidden');
+                catView.classList.remove('hidden');
+                btnCat.className = "px-3 py-1.5 rounded-md bg-white text-blue-600 shadow-sm transition";
+                btnPhrases.className = "px-3 py-1.5 rounded-md text-slate-600 hover:text-slate-900 transition";
+            }
+        };
+
+        // 백업 기능 (JSON 파일 다운로드)
+        window.backupData = function() {
+            const backupObj = {
+                version: "1.0",
+                exportDate: new Date().toISOString(),
+                categories: categories,
+                phrases: phrases
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `medical_phrases_backup_${new Date().toISOString().slice(0, 10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('백업 파일이 다운로드되었습니다.');
+        };
+
+        // 불러오기 기능 (JSON 파일 업로드 및 Firestore 반영)
+        window.restoreData = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const content = e.target.result;
+                    const parsedData = JSON.parse(content);
+
+                    if (!parsedData.categories || !parsedData.phrases) {
+                        alert('올바른 백업 파일 형식이 아닙니다.');
+                        return;
+                    }
+
+                    if (!confirm('기존 데이터를 유지하면서 백업 파일의 데이터를 추가(병합)하시겠습니까?\n[취소]를 누르면 기존 데이터를 모두 삭제하고 백업 데이터로 교체합니다.')) {
+                        // 전체 교체 모드일 경우 기존 데이터 삭제 처리 생략 후 일괄 덮어쓰기 가능하도록 배치 구성
+                    }
+
+                    const batch = writeBatch(db);
+
+                    // 대분류 저장
+                    parsedData.categories.forEach((cat, index) => {
+                        const id = cat.id || ('cat_' + index + '_' + Date.now());
+                        const catObj = { id, name: cat.name, order: cat.order !== undefined ? cat.order : index };
+                        batch.set(doc(db, CATEGORIES_COLLECTION, id), catObj);
+                    });
+
+                    // 문구 저장
+                    parsedData.phrases.forEach((p, index) => {
+                        const id = p.id || ('p_' + index + '_' + Date.now());
+                        const pObj = { id, category: p.category, content: p.content, order: p.order !== undefined ? p.order : index };
+                        batch.set(doc(db, PHRASES_COLLECTION, id), pObj);
+                    });
+
+                    await batch.commit();
+                    showToast('성공적으로 불러왔습니다!');
+                    loadDataFromFirebase();
+                } catch (err) {
+                    console.error("데이터 복원 실패:", err);
+                    alert('파일을 읽는 중 오류가 발생했습니다.');
+                } finally {
+                    event.target.value = ''; // 파일 input 초기화
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        window.copyToClipboard = function(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => showToast('클립보드에 복사되었습니다.'));
+            } else {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('클립보드에 복사되었습니다.');
+            }
+        };
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastText = document.getElementById('toast-text');
+            if (!toast || !toastText) return;
+            toastText.textContent = message;
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 1000);
+        }
+
+        window.openManagerModal = function() {
+            const modal = document.getElementById('manager-modal');
+            if (modal) modal.classList.remove('hidden');
+            switchModalTab('phrases');
+            currentModalCategory = '전체';
+            renderCategoryTabs();
+            resetForm();
+            resetCategoryForm();
+        };
+
+        window.closeManagerModal = function() {
+            const modal = document.getElementById('manager-modal');
+            if (modal) modal.classList.add('hidden');
+            loadDataFromFirebase();
+        };
+
+        function renderModalPhrasesList() {
+            const listContainer = document.getElementById('modal-phrases-list');
+            const totalCountEl = document.getElementById('modal-total-count');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            let filteredModalList = phrases.filter(p => {
+                return currentModalCategory === '전체' || p.category === currentModalCategory;
+            });
+
+            if (totalCountEl) totalCountEl.textContent = `전체 ${phrases.length}개 (현재 ${filteredModalList.length}개 표시)`;
+
+            if (filteredModalList.length === 0) {
+                listContainer.innerHTML = `<div class="p-6 text-center text-sm text-slate-400">등록된 문구가 없습니다.</div>`;
+                return;
+            }
+
+            filteredModalList.forEach((p) => {
+                const item = document.createElement('div');
+                item.className = "p-3 flex items-center justify-between hover:bg-slate-50 transition text-sm gap-2";
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3 overflow-hidden flex-1">
+                        <span class="px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-semibold rounded shrink-0">${escapeHtml(p.category)}</span>
+                        <span class="text-slate-600 truncate">${escapeHtml(p.content)}</span>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0">
+                        <div class="flex items-center space-x-0.5 mr-1 text-slate-400">
+                            <button onclick="moveOrder('${p.id}', 'up')" title="위로 이동" class="w-6 h-6 rounded hover:bg-slate-200 flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-up"></i></button>
+                            <button onclick="moveOrder('${p.id}', 'down')" title="아래로 이동" class="w-6 h-6 rounded hover:bg-slate-200 flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-down"></i></button>
+                        </div>
+                        <button onclick="editPhrase('${p.id}')" class="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-blue-50 hover:text-blue-600 transition">수정</button>
+                        <button onclick="deletePhrase('${p.id}')" class="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-red-50 hover:text-red-600 transition">삭제</button>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        window.moveOrder = async function(id, direction) {
+            const idx = phrases.findIndex(p => p.id === id);
+            if (idx < 0) return;
+            if (direction === 'up' && idx > 0) {
+                const temp = phrases[idx];
+                phrases[idx] = phrases[idx - 1];
+                phrases[idx - 1] = temp;
+            } else if (direction === 'down' && idx < phrases.length - 1) {
+                const temp = phrases[idx];
+                phrases[idx] = phrases[idx + 1];
+                phrases[idx + 1] = temp;
+            } else {
+                return;
+            }
+
+            const batch = writeBatch(db);
+            phrases.forEach((p, i) => {
+                p.order = i;
+                const ref = doc(db, PHRASES_COLLECTION, p.id);
+                batch.set(ref, p);
+            });
+            await batch.commit();
+            renderModalPhrasesList();
+            renderPhrases();
+        };
+
+        window.handleFormSubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const category = document.getElementById('form-category').value;
+            const content = document.getElementById('form-content').value.trim();
+
+            if (!content) return;
+
+            const targetId = id ? id : ('p_' + Date.now());
+            const order = id ? phrases.find(p => p.id === id).order : phrases.length;
+
+            const phraseObj = { id: targetId, category, content, order };
+            await setDoc(doc(db, PHRASES_COLLECTION, targetId), phraseObj);
+
+            if (id) {
+                const idx = phrases.findIndex(p => p.id === id);
+                if (idx !== -1) phrases[idx] = phraseObj;
+                showToast('문구가 수정되었습니다.');
+            } else {
+                phrases.push(phraseObj);
+                showToast('새 문구가 추가되었습니다.');
+            }
+
+            renderModalPhrasesList();
+            renderPhrases();
+            resetForm();
+        };
+
+        window.editPhrase = function(id) {
+            const p = phrases.find(item => item.id === id);
+            if (!p) return;
+            document.getElementById('edit-id').value = p.id;
+            document.getElementById('form-category').value = p.category;
+            document.getElementById('form-content').value = p.content;
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-pen text-blue-600"></i><span>문구 수정하기</span>`;
+            document.getElementById('submit-btn').textContent = '수정 완료';
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+        };
+
+        window.deletePhrase = async function(id, isBatch = false) {
+            if (isBatch || confirm('정말 이 문구를 삭제하시겠습니까?')) {
+                await deleteDoc(doc(db, PHRASES_COLLECTION, id));
+                phrases = phrases.filter(p => p.id !== id);
+                if (!isBatch) {
+                    renderModalPhrasesList();
+                    renderPhrases();
+                    showToast('문구가 삭제되었습니다.');
+                }
+            }
+        };
+
+        window.resetForm = function() {
+            const form = document.getElementById('phrase-form');
+            if (form) form.reset();
+            const editId = document.getElementById('edit-id');
+            if (editId) editId.value = '';
+            const formTitle = document.getElementById('form-title');
+            if (formTitle) formTitle.innerHTML = `<i class="fa-solid fa-plus text-blue-600"></i><span>새 문구 추가하기</span>`;
+            const submitBtn = document.getElementById('submit-btn');
+            if (submitBtn) submitBtn.textContent = '추가하기';
+            const cancelBtn = document.getElementById('cancel-edit-btn');
+            if (cancelBtn) cancelBtn.classList.add('hidden');
+        };
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        window.loadDataFromFirebase();
+    </script>
+</body>
+</html>
